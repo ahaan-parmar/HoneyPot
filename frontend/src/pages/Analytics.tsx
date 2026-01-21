@@ -2,25 +2,32 @@ import { useState, useEffect } from 'react';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { AttackTypeChart } from '@/components/charts/AttackTypeChart';
 import { VolumeChart } from '@/components/charts/VolumeChart';
-import { 
-  generateMockAttacks, 
-  getAttackTypeDistribution, 
-  getTopEndpoints, 
-  getHourlyAttackVolume 
-} from '@/data/mockData';
 import { TrendingUp, Target } from 'lucide-react';
+import { getAnalytics } from '@/lib/api';
 
 const Analytics = () => {
-  const [attacks] = useState(() => generateMockAttacks(200));
   const [attackTypeData, setAttackTypeData] = useState<{ name: string; value: number }[]>([]);
   const [volumeData, setVolumeData] = useState<{ hour: string; attacks: number }[]>([]);
   const [topEndpoints, setTopEndpoints] = useState<{ endpoint: string; attacks: number }[]>([]);
 
   useEffect(() => {
-    setAttackTypeData(getAttackTypeDistribution(attacks));
-    setVolumeData(getHourlyAttackVolume(attacks));
-    setTopEndpoints(getTopEndpoints(attacks));
-  }, [attacks]);
+    let cancelled = false;
+    const load = async () => {
+      try {
+        const data = await getAnalytics();
+        if (cancelled) return;
+        setAttackTypeData(data.attackTypeDistribution || []);
+        setVolumeData(data.hourlyAttackVolume || []);
+        setTopEndpoints(data.topEndpoints || []);
+      } catch {
+        // keep UI stable if backend is down
+      }
+    };
+    void load();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   return (
     <DashboardLayout>
@@ -58,7 +65,7 @@ const Analytics = () => {
                   <div className="mt-1 h-1.5 bg-secondary rounded-full overflow-hidden">
                     <div 
                       className="h-full bg-primary rounded-full transition-all duration-500"
-                      style={{ width: `${(item.attacks / topEndpoints[0].attacks) * 100}%` }}
+                      style={{ width: `${topEndpoints[0]?.attacks ? (item.attacks / topEndpoints[0].attacks) * 100 : 0}%` }}
                     />
                   </div>
                 </div>

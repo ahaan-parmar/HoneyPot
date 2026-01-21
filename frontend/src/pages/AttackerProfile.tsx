@@ -1,5 +1,5 @@
 import { useParams, Link } from 'react-router-dom';
-import { useMemo } from 'react';
+import { useEffect, useState } from 'react';
 import { ArrowLeft, Globe, Server, Clock, Activity } from 'lucide-react';
 import { format } from 'date-fns';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
@@ -7,13 +7,47 @@ import { RiskGauge } from '@/components/attacker/RiskGauge';
 import { ClassificationBadge } from '@/components/attacker/ClassificationBadge';
 import { RequestsChart } from '@/components/charts/RequestsChart';
 import { AttackTable } from '@/components/dashboard/AttackTable';
-import { generateAttackerProfile } from '@/data/mockData';
+import type { AttackerProfile as AttackerProfileType } from '@/data/mockData';
+import { getAttackerProfile } from '@/lib/api';
 
 const AttackerProfile = () => {
   const { ip } = useParams<{ ip: string }>();
   const decodedIP = ip ? decodeURIComponent(ip) : '';
   
-  const profile = useMemo(() => generateAttackerProfile(decodedIP), [decodedIP]);
+  const [profile, setProfile] = useState<AttackerProfileType | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    const load = async () => {
+      if (!decodedIP) return;
+      try {
+        const p = await getAttackerProfile(decodedIP);
+        if (cancelled) return;
+        setProfile(p);
+      } catch {
+        // keep UI stable if backend is down
+      }
+    };
+    void load();
+    return () => {
+      cancelled = true;
+    };
+  }, [decodedIP]);
+
+  if (!profile) {
+    return (
+      <DashboardLayout>
+        <Link
+          to="/"
+          className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors mb-6"
+        >
+          <ArrowLeft className="w-4 h-4" />
+          Back to Live Feed
+        </Link>
+        <div className="text-sm text-muted-foreground">Loading attacker profile…</div>
+      </DashboardLayout>
+    );
+  }
 
   return (
     <DashboardLayout>

@@ -3,7 +3,8 @@ import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { StatCard } from '@/components/dashboard/StatCard';
 import { AttackTable } from '@/components/dashboard/AttackTable';
 import { LiveIndicator } from '@/components/dashboard/LiveIndicator';
-import { generateMockAttacks, getAttackStats, type Attack } from '@/data/mockData';
+import { getAttackStats, type Attack } from '@/data/mockData';
+import { getAttacks } from '@/lib/api';
 
 const Index = () => {
   const [attacks, setAttacks] = useState<Attack[]>([]);
@@ -15,20 +16,29 @@ const Index = () => {
   });
 
   useEffect(() => {
-    const initialAttacks = generateMockAttacks(50);
-    setAttacks(initialAttacks);
-    setStats(getAttackStats(initialAttacks));
+    let cancelled = false;
+
+    const load = async () => {
+      try {
+        const latest = await getAttacks(50);
+        if (cancelled) return;
+        setAttacks(latest);
+        setStats(getAttackStats(latest));
+      } catch {
+        // If backend is down, keep UI stable (no hard crash).
+      }
+    };
+
+    void load();
 
     const interval = setInterval(() => {
-      setAttacks(prev => {
-        const newAttack = generateMockAttacks(1)[0];
-        const updated = [newAttack, ...prev.slice(0, 49)];
-        setStats(getAttackStats(updated));
-        return updated;
-      });
+      void load();
     }, 5000);
 
-    return () => clearInterval(interval);
+    return () => {
+      cancelled = true;
+      clearInterval(interval);
+    };
   }, []);
 
   return (
